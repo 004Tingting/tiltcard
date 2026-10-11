@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>3D Tilt Card 演示 — 通用 3D 交互卡片</title>
+<style>
+  html { color-scheme: light; }
+  body { margin: 0 auto; max-width: 900px; padding: 32px 20px 120px; background: #fff;
+         font: 16px/1.75 system-ui, "Microsoft YaHei", sans-serif; color: #222; }
+  h1 { font-size: 26px; }
+  h2 { font-size: 19px; margin-top: 40px; }
+  .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .card { background: #f6f7f9; border-radius: 12px; padding: 16px 18px; margin: 14px 0; }
+  .dark { background: #17181c; border-radius: 12px; padding: 16px 18px; margin: 14px 0; }
+  code { background: #eef0f4; border-radius: 4px; padding: 0 4px; }
+  #perf { font: 13px/1.6 ui-monospace, Consolas, monospace; color: #555; }
+  var { font-style: normal; color: #5b7fe5; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>3D Tilt Card 演示页</h1>
+<p>通用 3D 交互卡片插件（成就徽章是它的默认预设场景）：<strong>鼠标悬停在卡片上时卡面朝向跟随光标倾斜</strong>，
+<strong>点击（可配置 hover/drag）翻面</strong>查看背面信息。悬停期间才有渲染活动，
+空闲时零 rAF、零定时器。</p>
+
+<h2>稀有度四档（默认程序化徽章，点击翻面）</h2>
+<div class="row">
+  <tilt-card-3d size="170" rarity="common" title="初次登场" desc="完成新手引导" date="2026-10-11"></tilt-card-3d>
+  <tilt-card-3d size="170" rarity="rare" title="连续七日" desc="累计登录 7 天" date="2026-10-11"></tilt-card-3d>
+  <tilt-card-3d size="170" rarity="epic" title="百战不殆" desc="赢得 100 场对局" date="2026-10-11"></tilt-card-3d>
+  <tilt-card-3d size="170" rarity="legendary" title="传奇诞生" desc="达成全部成就" date="2026-10-11"></tilt-card-3d>
+</div>
+
+<h2>翻面模式（flip 属性）</h2>
+<div class="row">
+  <div><tilt-card-3d size="140" flip="click" rarity="rare" title="点击翻面"></tilt-card-3d><p style="text-align:center">click（默认）</p></div>
+  <div><tilt-card-3d size="140" flip="hover" rarity="epic" title="悬停翻面"></tilt-card-3d><p style="text-align:center">hover</p></div>
+  <div><tilt-card-3d size="140" flip="drag" rarity="legendary" title="拖拽翻面"></tilt-card-3d><p style="text-align:center">drag（左右拖 40px）</p></div>
+  <div><tilt-card-3d size="140" flip="off" rarity="common" title="不翻面"></tilt-card-3d><p style="text-align:center">off</p></div>
+</div>
+
+<h2>自定义图片 + tilt 幅度 + slot 背面</h2>
+<div class="card">
+  <div class="row">
+    <tilt-card-3d id="imgOne" size="170" rarity="rare" title="自定义正面" tilt="20"></tilt-card-3d>
+    <tilt-card-3d size="170" rarity="legendary" title="自定义背面">
+      <div slot="back" style="display:flex;align-items:center;justify-content:center;height:100%;
+           background:linear-gradient(150deg,#2b1a4d,#120a24);color:#e9d5ff;font-family:system-ui;">
+        <div style="text-align:center">
+          <div style="font-size:34px">🏆</div>
+          <div style="font-weight:700;margin-top:4px">任意 HTML 背面</div>
+          <div style="font-size:11px;opacity:.7">slot="back" 完全自定义</div>
+        </div>
+      </div>
+    </tilt-card-3d>
+    <tilt-card-3d size="140" rarity="common" title="小尺寸" tilt="18"></tilt-card-3d>
+  </div>
+  <p style="margin:10px 0 0">第一个徽章用 <code>img</code> 属性传入自定义图（下方 JS 注入内联 SVG），
+  <code>tilt="20"</code> 加大倾斜幅度；第二个用 <code>slot="back"</code> 放任意 HTML。</p>
+</div>
+
+<div class="dark">
+  <div class="row" style="margin:0">
+    <tilt-card-3d size="140" rarity="epic" title="深色宿主也协调"></tilt-card-3d>
+    <tilt-card-3d size="140" rarity="legendary" title="传说档悬停有脉冲光"></tilt-card-3d>
+  </div>
+</div>
+
+<h2>性能自检</h2>
+<div id="perf">采集中……</div>
+
+<h2>卡面效果（surface 属性，v1.1.0 新增）</h2>
+<p>按 <a href="https://codepen.io/simeydotme/pen/PrQKgo" target="_blank" rel="noopener">Pokemon Card Holo Effect（PrQKgo）</a>
+的卡牌形态复刻：surface=<code>holo</code>（普通全息）/ <code>rainbow</code>（彩虹稀有）/
+<code>cosmos</code>（宇宙全息）——4 倍超大彩虹背景随指针
+压缩扫动（扫过约 2 个卡宽），color-dodge 打在卡面上，正反面同享，可与任意稀有度、
+图片、翻面模式组合。零 filter、零图片素材，效果层随挂载创建。</p>
+<div class="row">
+  <div><tilt-card-3d size="150" surface="rainbow" rarity="legendary" title="彩虹稀有"></tilt-card-3d><p style="text-align:center">rainbow · 彩虹稀有（无文字）</p></div>
+  <div><tilt-card-3d size="150" surface="rainbow" rarity="legendary" title="彩虹稀有·分层文字">
+    <div slot="front" style="position:absolute;inset:0;background:linear-gradient(165deg,#181c26,#0c0f16);display:flex;flex-direction:column;align-items:center;padding-top:15px;">
+      <div style="font:700 9px/1 system-ui,sans-serif;letter-spacing:.34em;color:rgba(255,255,255,.5);">UNLOCKED</div>
+      <div style="position:relative;margin-top:7px;font:700 21px/1 system-ui,sans-serif;letter-spacing:.05em;text-align:center;">
+        <span style="position:absolute;left:0;right:0;top:7px;color:rgba(255,255,255,.15);">LEGENDARY</span>
+        <span style="position:absolute;left:0;right:0;top:3.5px;color:rgba(255,255,255,.32);">LEGENDARY</span>
+        <span style="position:relative;color:#fff;text-shadow:0 0 12px rgba(255,255,255,.35);">LEGENDARY</span>
+      </div>
+      <div style="margin-top:10px;font:700 12px/1.6 system-ui,sans-serif;color:rgba(255,255,255,.78);">全成就达成</div>
+      <div style="margin-top:2px;font:500 9px/1 system-ui,sans-serif;letter-spacing:.2em;color:rgba(255,255,255,.4);">2026 · RAINBOW RARE</div>
+    </div>
+  </tilt-card-3d><p style="text-align:center">rainbow · 彩虹稀有（分层文字）</p></div>
+  <div><tilt-card-3d size="150" surface="holo" rarity="rare" title="普通全息"></tilt-card-3d><p style="text-align:center">holo · 普通全息</p></div>
+  <div><tilt-card-3d size="150" surface="cosmos" rarity="epic" title="宇宙全息"></tilt-card-3d><p style="text-align:center">cosmos · 宇宙全息</p></div>
+  <div><tilt-card-3d id="imgHolo" size="150" surface="holo" rarity="epic" title="自定义图 + 全息"></tilt-card-3d><p style="text-align:center">img + holo 组合</p></div>
+</div>
+
+<h2>通用化（v1.2.0）：theme / ratio / art</h2>
+<p>三步从"成就徽章"走向任意卡片：<code>theme</code>——在元素上覆盖 <code>--tc-glow/--tc-hi/--tc-lo/--tc-tag</code>
+即整卡换色（含奖章 SVG）；<code>ratio</code>——宽高比预设 <code>card(1.1)</code>/<code>tarot(1.72)</code>/<code>photo(1.4)</code>/<code>square(1)</code>
+或直接写数字，适配任意卡型；<code>art="none"</code>——关闭默认奖章，得到纯卡面（配 slot="front" 完全自绘）。</p>
+<div class="row">
+  <div><tilt-card-3d size="150" surface="holo" rarity="epic" title="青金主题" desc="theme 自定义配色"
+    style="--tc-glow:#22d3ee;--tc-hi:#a5f3fc;--tc-lo:#0e7490;--tc-tag:#22d3ee;"></tilt-card-3d><p style="text-align:center">theme · --tc-* 换色</p></div>
+  <div><tilt-card-3d size="130" ratio="tarot" rarity="rare" title="塔罗比例" desc="ratio=tarot"></tilt-card-3d><p style="text-align:center">ratio · tarot（1:1.72）</p></div>
+  <div><tilt-card-3d size="150" art="none" rarity="common" title="纯卡面" desc="art=none 无奖章">
+    <div slot="front" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 20px system-ui,sans-serif;letter-spacing:.3em;color:#5b6472;">ANY</div>
+  </tilt-card-3d><p style="text-align:center">art · none 无奖章</p></div>
+</div>
+<script>
+(() => {
+  // 给 img+holo 徽章注入一张内联 SVG 卡面（演示 surface 与 img 组合）
+  const art = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#1e3a8a"/><stop offset=".5" stop-color="#7c3aed"/><stop offset="1" stop-color="#be185d"/>' +
+    '</linearGradient></defs><rect width="100" height="100" rx="14" fill="url(#g)"/>' +
+    '<circle cx="50" cy="42" r="18" fill="rgba(255,255,255,.9)"/>' +
+    '<text x="50" y="80" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">FOIL ART</text></svg>';
+  document.getElementById('imgHolo').setAttribute('img', 'data:image/svg+xml;utf8,' + encodeURIComponent(art));
+})();
+</script>
+
+<h2>多层卡面（v1.3.0）：data-tc-offset</h2>
+<p>学 Atropos Showcase 的盒装分层：<code>slot="front"</code> 内带
+<code>data-tc-offset="N"</code> 的子元素随倾斜平移 N 像素——负值后退（背景）、正值浮起
+（标题/图标）、阶梯值表达层级（0 / 2 / 4.5）。素材用 absolute 铺满对齐即可，全部
+transform-only 合成器路径。</p>
+<div class="row">
+  <div><tilt-card-3d size="150" art="none" rarity="common" title="多层卡面" flip="hover">
+    <div slot="front" style="position:absolute;inset:0;background:linear-gradient(160deg,#232833,#12151c);">
+      <div data-tc-offset="-3" style="position:absolute;inset:-9%;background:radial-gradient(120% 100% at 32% 18%,#33456a,#12151c 72%);"></div>
+      <div data-tc-offset="2" style="position:absolute;left:9%;right:9%;top:36%;font:700 16px/1.35 system-ui,sans-serif;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.55);">多层卡面<br>层级随倾斜展开</div>
+      <div data-tc-offset="4.5" style="position:absolute;right:7%;bottom:7%;font:700 9px/1 system-ui,sans-serif;letter-spacing:.22em;color:#22d3ee;border:1px solid #22d3ee;border-radius:99px;padding:3px 8px;">TC · LAYERS</div>
+      <div data-tc-offset="0" style="position:absolute;left:7%;top:6%;font:700 8px/1 system-ui,sans-serif;letter-spacing:.3em;color:rgba(255,255,255,.4);">TILTCARD OS</div>
+    </div>
+  </tilt-card-3d><p style="text-align:center">data-tc-offset 阶梯（-3/0/2/4.5）</p></div>
+  <div><tilt-card-3d size="150" art="none" rarity="common" title="多层卡面·图标" flip="hover">
+    <div slot="front" style="position:absolute;inset:0;background:linear-gradient(165deg,#1a1030,#0c0817);">
+      <div data-tc-offset="-4" style="position:absolute;inset:-10%;background:radial-gradient(110% 90% at 70% 25%,#4c1d95,#0c0817 75%);"></div>
+      <div data-tc-offset="2.5" style="position:absolute;left:9%;right:9%;top:34%;font:700 17px/1.3 system-ui,sans-serif;color:#f5f3ff;text-shadow:0 0 14px rgba(167,139,250,.5);">图标浮起<br>背景沉底</div>
+      <div data-tc-offset="5" style="position:absolute;left:9%;bottom:9%;font:600 22px/1 system-ui,sans-serif;">🎮</div>
+      <div data-tc-offset="5" style="position:absolute;left:44%;bottom:8%;font:600 22px/1 system-ui,sans-serif;">🏆</div>
+      <div data-tc-offset="5" style="position:absolute;right:9%;bottom:9%;font:600 22px/1 system-ui,sans-serif;">⚡</div>
+    </div>
+  </tilt-card-3d><p style="text-align:center">图标阶梯浮起（5）+ 背景沉底（-4）</p></div>
+</div>
+<script src="dist/tiltcard.js?v=4"></script>
+<script>
+(() => {
+  // 给第一个自定义图徽章注入一张内联 SVG（演示 img 属性用法）
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+    '<rect width="100" height="100" rx="16" fill="#1d2129"/>' +
+    '<circle cx="50" cy="44" r="20" fill="#3b82f6"/>' +
+    '<text x="50" y="52" text-anchor="middle" font-size="22">🎮</text>' +
+    '<text x="50" y="84" text-anchor="middle" font-size="11" fill="#93c5fd">MY GAME</text></svg>';
+  document.getElementById('imgOne').setAttribute('img', 'data:image/svg+xml;utf8,' + encodeURIComponent(svg));
+
+  const perf = [];
+  const put = (k, v) => { perf[k] = v; render(); };
+  function render() {
+    document.getElementById('perf').innerHTML = Object.entries(perf)
+      .map(([k, v]) => k + '：<var>' + v + '</var>').join('<br>');
+  }
+  let longtasks = 0;
+  try {
+    new PerformanceObserver((l) => { longtasks += l.getEntries().length; put('长任务（>50ms）次数', longtasks); })
+      .observe({ entryTypes: ['longtask'] });
+  } catch (e) { put('长任务监控', '浏览器不支持'); }
+  addEventListener('load', () => {
+    const res = performance.getEntriesByType('resource').find((e) => e.name.includes('tiltcard.js'));
+    if (res) put('脚本加载+执行耗时', res.duration.toFixed(1) + ' ms');
+    put('版本', window.__Widgets.tiltCard3d.version);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>分层视差（Atropos 风格）— 独立实现变体</title>
+<style>
+  html { color-scheme: light; }
+  body { margin: 0 auto; max-width: 960px; padding: 32px 20px 100px; background: #fff;
+         font: 16px/1.75 system-ui, "Microsoft YaHei", sans-serif; color: #222; }
+  h1 { font-size: 26px; }
+  h2 { font-size: 19px; margin-top: 40px; }
+  h3 { font-size: 15px; margin: 0 0 10px; color: #444; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(300px, 1fr)); gap: 34px; }
+  .note { color: #666; font-size: 13.5px; }
+  .meta { font: 12px/1.7 ui-monospace, Consolas, monospace; color: #555; }
+  /* —— 视差舞台通用 —— */
+  .par { position: relative; width: 300px; height: 360px; border-radius: 20px;
+         perspective: 900px; }
+  .box { position: absolute; inset: 0; border-radius: 20px; overflow: hidden;
+         background: radial-gradient(120% 100% at 50% 0%, #232a3a, #0d1017 70%);
+         transform-style: preserve-3d; }
+  .layer { position: absolute; }
+  /* will-change 仅交互期（学 tilt.js）：控制器在 enter 时给 .box 加 live 类提升合成层，leave 移除 */
+  .box.live .layer { will-change: transform; }
+  .l-glow { inset: -30%; background:
+      radial-gradient(38% 30% at 50% 40%, rgba(245,158,11,.55), rgba(245,158,11,0) 70%); }
+  .l-ring { left: 50%; top: 44%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
+      border-radius: 50%; border: 14px solid transparent;
+      background: linear-gradient(#1d2129,#1d2129) padding-box,
+                  conic-gradient(from 210deg, #fde68a, #b45309, #fde68a) border-box; }
+  .l-star { left: 50%; top: 44%; width: 150px; height: 150px; margin: -75px 0 0 -75px; }
+  .l-star svg { width: 100%; height: 100%; }
+  .l-ribbon { left: 50%; top: 61%; width: 150px; margin-left: -75px; height: 42px;
+      background: linear-gradient(180deg, #fbbf24, #b45309);
+      clip-path: polygon(0 0, 100% 0, 91% 50%, 100% 100%, 0 100%, 9% 50%);
+      display: flex; align-items: center; justify-content: center;
+      font: 700 13px/1 system-ui, sans-serif; letter-spacing: .18em; color: #451a03; }
+  .l-title { left: 0; right: 0; top: 80%; text-align: center; color: #fde68a;
+      font: 700 22px/1.4 system-ui, sans-serif; letter-spacing: .08em;
+      text-shadow: 0 2px 12px rgba(245,158,11,.45); }
+  .l-sub { left: 0; right: 0; top: 87%; text-align: center; color: #8a93a3;
+      font: 12px/1.4 system-ui, sans-serif; }
+
+  /* —— 厚度板（C/D）：CSS 立方体——正面 + 四侧边，边缘随旋转可见 —— */
+  .par.slab { --t: 16px; } /* 板厚 */
+  .par.slab .box { overflow: visible; }
+  .slab-core { position: absolute; inset: 0; transform-style: preserve-3d; }
+  .s-face { position: absolute; }
+  .sf-front { inset: 0; border-radius: 14px; transform-style: preserve-3d;
+      transform: translateZ(calc(var(--t) / 2));
+      background: radial-gradient(120% 100% at 50% 0%, #232a3a, #0d1017 70%),
+                  linear-gradient(#2a3040, #171b24); }
+  .sf-back { inset: 0; border-radius: 14px; background: #101319;
+      transform: rotateY(180deg) translateZ(calc(var(--t) / 2)); }
+  .s-top    { left: 0; width: 100%; height: var(--t); top: calc(0px - var(--t) / 2);
+      transform: rotateX(90deg); background: linear-gradient(90deg, #3d3520, #6b5620, #3d3520); }
+  .s-bottom { left: 0; width: 100%; height: var(--t); top: calc(100% - var(--t) / 2);
+      transform: rotateX(90deg); background: linear-gradient(90deg, #2c2818, #4d3f1a, #2c2818); }
+  .s-left   { top: 0; height: 100%; width: var(--t); left: calc(0px - var(--t) / 2);
+      transform: rotateY(90deg); background: linear-gradient(180deg, #4d3f1a, #2c2818); }
+  .s-right  { top: 0; height: 100%; width: var(--t); left: calc(100% - var(--t) / 2);
+      transform: rotateY(90deg); background: linear-gradient(180deg, #6b5620, #3d3520); }
+  /* 厚度板内部的悬浮内容层（相对正面再向上抬起，产生内部视差） */
+  .slab-core .layer { left: 0; right: 0; margin: 0; }
+  .slab-core .l-glow { inset: 0; }
+  .slab-core .l-ring { left: 50%; top: 44%; margin: -120px 0 0 -120px; }
+  .slab-core .l-star { left: 50%; top: 44%; margin: -75px 0 0 -75px; }
+  .slab-core .l-ribbon { left: 50%; margin-left: -75px; }
+  .slab-core .l-title, .slab-core .l-sub { left: 0; right: 0; }
+  .hint { position: absolute; left: 12px; top: 10px; font: 11px system-ui; color: #6b7280; z-index: 5; }
+</style>
+</head>
+<body>
+<h1>分层视差效果验证（Atropos 风格）— 4 形态</h1>
+<p class="note">A/B 为平面分层视差（z=0 上 2D 平移）；C/D 为<b>厚度板</b>：
+徽章本体是带侧边的 3D 板（倾斜时可见盒身边缘，如 PS5 游戏盒），
+板内内容再按不同 <code>translateZ</code> 悬浮，产生<b>厚度 + 内部视差分层</b>。
+全部跟随光标、rAF + 惯性 lerp、回正自动停帧、纯 transform 零依赖；
+rect 激活期缓存、will-change 仅交互期（Atropos/tilt.js 惯例）。</p>
+
+<div class="grid">
+  <div>
+    <h3>A · 纯视差（平面 2D，无倾斜）</h3>
+    <div class="par" id="pA">
+      <div class="box">
+        <div class="layer l-glow" data-depth="4"></div>
+        <div class="layer l-ring" data-depth="10"></div>
+        <div class="layer l-star" data-depth="20">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="sgA" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#d97706"/>
+            </linearGradient></defs>
+            <polygon fill="url(#sgA)" stroke="#92400e" stroke-width="1.5"
+              points="50,6 61.8,35.8 93.6,38.8 69.3,60.2 76.8,91.4 50,74 23.2,91.4 30.7,60.2 6.4,38.8 38.2,35.8"/>
+          </svg>
+        </div>
+        <div class="layer l-ribbon" data-depth="28">全成就达成</div>
+        <div class="layer l-title" data-depth="36">LEGENDARY</div>
+        <div class="layer l-sub" data-depth="42">全成就达成 · 2026</div>
+      </div>
+    </div>
+    <p class="meta">图层：z=0 平面 2D 平移（data-depth = 满偏移 px）</p>
+  </div>
+
+  <div>
+    <h3>B · 视差 + 容器倾斜</h3>
+    <div class="par" id="pB">
+      <div class="box">
+        <div class="layer l-glow" data-depth="4"></div>
+        <div class="layer l-ring" data-depth="10"></div>
+        <div class="layer l-star" data-depth="20">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="sgB" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#d97706"/>
+            </linearGradient></defs>
+            <polygon fill="url(#sgB)" stroke="#92400e" stroke-width="1.5"
+              points="50,6 61.8,35.8 93.6,38.8 69.3,60.2 76.8,91.4 50,74 23.2,91.4 30.7,60.2 6.4,38.8 38.2,35.8"/>
+          </svg>
+        </div>
+        <div class="layer l-ribbon" data-depth="28">全成就达成</div>
+        <div class="layer l-title" data-depth="36">LEGENDARY</div>
+        <div class="layer l-sub" data-depth="42">全成就达成 · 2026</div>
+      </div>
+    </div>
+    <p class="meta">图层：2D 平移 + 容器 rotateX/Y ±10°</p>
+  </div>
+
+  <div>
+    <h3>C · 厚度板 + 内部视差（跟随 ±12°）</h3>
+    <div class="par slab" id="pC">
+      <div class="box">
+        <div class="slab-core">
+          <div class="s-face s-top"></div>
+          <div class="s-face s-bottom"></div>
+          <div class="s-face s-left"></div>
+          <div class="s-face s-right"></div>
+          <div class="s-face sf-back"></div>
+          <div class="s-face sf-front">
+            <div class="layer l-glow" data-z="4"></div>
+            <div class="layer l-ring" data-z="12"></div>
+            <div class="layer l-star" data-z="24">
+              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="sgC" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#d97706"/>
+                </linearGradient></defs>
+                <polygon fill="url(#sgC)" stroke="#92400e" stroke-width="1.5"
+                  points="50,6 61.8,35.8 93.6,38.8 69.3,60.2 76.8,91.4 50,74 23.2,91.4 30.7,60.2 6.4,38.8 38.2,35.8"/>
+              </svg>
+            </div>
+            <div class="layer l-ribbon" data-z="32">全成就达成</div>
+            <div class="layer l-title" data-z="38">LEGENDARY</div>
+            <div class="layer l-sub" data-z="42">全成就达成 · 2026</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="meta">板厚 16px（四侧边可见）· 内部层 translateZ 4–42px<br>倾斜时：边缘 + 内部分层视差同时呈现</p>
+  </div>
+
+  <div>
+    <h3>D · 厚度板 · 强化（跟随 ±18° + 平移叠加）</h3>
+    <div class="par slab" id="pD">
+      <div class="box">
+        <div class="slab-core">
+          <div class="s-face s-top"></div>
+          <div class="s-face s-bottom"></div>
+          <div class="s-face s-left"></div>
+          <div class="s-face s-right"></div>
+          <div class="s-face sf-back"></div>
+          <div class="s-face sf-front">
+            <div class="layer l-glow" data-z="4" data-depth="3"></div>
+            <div class="layer l-ring" data-z="12" data-depth="6"></div>
+            <div class="layer l-star" data-z="24" data-depth="10">
+              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="sgD" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#d97706"/>
+                </linearGradient></defs>
+                <polygon fill="url(#sgD)" stroke="#92400e" stroke-width="1.5"
+                  points="50,6 61.8,35.8 93.6,38.8 69.3,60.2 76.8,91.4 50,74 23.2,91.4 30.7,60.2 6.4,38.8 38.2,35.8"/>
+              </svg>
+            </div>
+            <div class="layer l-ribbon" data-z="32" data-depth="12">全成就达成</div>
+            <div class="layer l-title" data-z="38" data-depth="14">LEGENDARY</div>
+            <div class="layer l-sub" data-z="42" data-depth="16">全成就达成 · 2026</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="meta">厚度板 + 2D 平移叠加（data-depth）+ ±18° 旋转<br>四种效果的全合体形态</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+  /* 统一控制器：
+     flat2d : 图层 2D 平移（A）
+     tilt2d : 图层 2D 平移 + 容器倾斜（B）
+     slab   : 厚度板旋转，内部层 translateZ 视差（C）
+     slab2d : 厚度板 + 内部层 translateZ + 2D 平移叠加（D） */
+  function makeParallax(root, opts) {
+    const o = Object.assign({ kind: 'flat2d', tiltDeg: 10 }, opts);
+    const box = root.querySelector('.box');
+    const layers = [...root.querySelectorAll('.layer')].map((el) => ({
+      el, depth: parseFloat(el.dataset.depth) || 0, z: parseFloat(el.dataset.z) || 0,
+    }));
+    let raf = 0, active = false, last = 0, rectCache = null;
+    const cur = { x: 0, y: 0, rx: 0, ry: 0 };
+    const tgt = { x: 0, y: 0, rx: 0, ry: 0 };
+
+    function apply() {
+      for (const l of layers) {
+        let tf;
+        if (o.kind === 'flat2d' || o.kind === 'tilt2d') {
+          tf = 'translate3d(' + (cur.x * l.depth).toFixed(2) + 'px,' + (cur.y * l.depth).toFixed(2) + 'px,0)';
+        } else if (o.kind === 'slab') {
+          tf = 'translateZ(' + l.z.toFixed(1) + 'px)';
+        } else { // slab2d
+          tf = 'translate3d(' + (cur.x * l.depth).toFixed(2) + 'px,' + (cur.y * l.depth).toFixed(2) + 'px,' + l.z.toFixed(1) + 'px)';
+        }
+        l.el.style.transform = tf;
+      }
+      if (o.kind !== 'flat2d') {
+        box.style.transform =
+          'rotateX(' + cur.rx.toFixed(2) + 'deg) rotateY(' + cur.ry.toFixed(2) + 'deg)';
+      } else {
+        box.style.transform = '';
+      }
+    }
+
+    function frame(now) {
+      const dt = Math.min((now - last) / 1000, 0.05) || 0.016;
+      last = now;
+      const k = 1 - Math.exp(-dt * 10);
+      cur.x += (tgt.x - cur.x) * k;
+      cur.y += (tgt.y - cur.y) * k;
+      cur.rx += (tgt.rx - cur.rx) * k;
+      cur.ry += (tgt.ry - cur.ry) * k;
+      apply();
+      const settled =
+        Math.abs(tgt.x - cur.x) < .01 && Math.abs(tgt.y - cur.y) < .01 &&
+        Math.abs(tgt.rx - cur.rx) < .01 && Math.abs(tgt.ry - cur.ry) < .01;
+      raf = (active || !settled) ? requestAnimationFrame(frame) : 0;
+    }
+    const wake = () => { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+
+    root.addEventListener('pointerenter', () => {
+      active = true;
+      rectCache = root.getBoundingClientRect(); // T1：激活期缓存一次，leave 失效
+      box.classList.add('live'); // T2：will-change 仅交互期
+      wake();
+    });
+    root.addEventListener('pointermove', (e) => {
+      const r = rectCache || (rectCache = root.getBoundingClientRect()); // move 路径零布局读取
+      const dx = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2), -1, 1);
+      const dy = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2), -1, 1);
+      tgt.x = dx; tgt.y = dy;
+      if (o.kind !== 'flat2d') { tgt.ry = dx * o.tiltDeg; tgt.rx = -dy * o.tiltDeg; }
+      wake();
+    }, { passive: true });
+    root.addEventListener('pointerleave', () => {
+      active = false;
+      rectCache = null; // 缓存失效，重新进入时刷新
+      box.classList.remove('live');
+      tgt.x = tgt.y = tgt.rx = tgt.ry = 0; wake();
+    });
+    wake();
+  }
+
+  makeParallax(document.getElementById('pA'), { kind: 'flat2d' });
+  makeParallax(document.getElementById('pB'), { kind: 'tilt2d', tiltDeg: 10 });
+  makeParallax(document.getElementById('pC'), { kind: 'slab', tiltDeg: 12 });
+  makeParallax(document.getElementById('pD'), { kind: 'slab2d', tiltDeg: 18 });
+})();
+</script>
+</body>
+</html>
